@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+
+    <link rel="stylesheet" href="angularJs/bootstrap/dist/css/bootstrap.css"/>
+
+
+    <script src="angularJs/jquery/dist/jquery.js"></script>
+    <script src="angularJs/bootstrap/dist/js/bootstrap.min.js"></script>
+
+
+    <script src="angularJs/angular/angular.min.js"></script>
+    <script language="JavaScript">
+        var app = angular.module('summarizerApp', []);
+
+        app.factory('summarizerService', function ($http) {
+            const PATH_REST_SERVICES_SUMMARY = "http://localhost:8001/getSummary";
+
+            return {
+                summary: function (data) {
+                    return $http({
+                        url: PATH_REST_SERVICES_SUMMARY,
+                        headers: {"Content-Type": "application/x-www-form-urlencoded; charset=utf-8"},
+                        data: data,
+                        method: "POST"
+                    });
+                }
+
+            };
+        });
+        app.controller('controllerSummarizer', function ($scope, summarizerService) {
+
+            $scope.summaryD = null;
+            $scope.rate = null;
+            $scope.phrases = null;
+            $scope.lengthValue = null;
+            $scope.typeLength = ["Percentuale", "Frasi"];
+            $scope.redundancyThresold = 0.95;
+            $scope.tdidfThreshold = 0.2;
+
+            $scope.nameSumm = null;
+
+            $scope.errorInput = null;
+
+            $scope.summaryDocument = function () {
+                var id = document.getElementById('titleDoc').value;
+                var contents = document.getElementById('textDoc').value;
+                var querySummaryDummy = document.getElementById('querySummary').value;
+				
+				var querySummary = [];
+				if(querySummaryDummy.localeCompare("") != 0){
+					querySummary = querySummaryDummy.split(" ");
+				} 
+				
+                var lengthValue;
+                if ($scope.rate != null) {
+                    lengthValue = $scope.lengthValue / 100;
+                } else {
+                    lengthValue = $scope.lengthValue;
+                }
+                var data = JSON.stringify({
+                    redundancy_threshold: $scope.redundancyThresold,
+                    tfidf_threshold: $scope.tdidfThreshold,
+                    query_based_token: querySummary,
+                    summary_length: lengthValue,
+                    documents: [{id: id, text: contents}]
+                });
+
+                summarizerService.summary(data).
+                    then(
+                        function (response) {
+							var doc = response.data[0];
+							var id = doc['id'];
+                            var summary = doc['summary'];
+                            document.getElementById('summaryText').value = id+"\n\n"+summary;
+                            $scope.summaryD = "summaryD";
+							var error = doc['error'];
+							if(error.localeCompare("") != 0){
+								alert(error);
+							}
+                        },
+                        function (response) {
+                            document.getElementById('summaryText').value = "Errore! Riassunto non effettuato.";
+                            $scope.summaryD = "summaryD";
+                        }
+                );
+
+
+            };
+
+            $scope.setParamSummary = function () {
+                $scope.redundancyThresold = document.getElementById('redundancy_thresold').value;
+                $scope.tdidfThreshold = document.getElementById('tdidf_threshold').value;
+            };
+            $scope.nameSummary = function () {
+                $scope.nameSumm =  document.getElementById('titleDoc').value;;
+            };
+            $scope.valuedInputSummary = function (lengthType, rateValue, phrasesValue) {
+                var typeL = document.getElementById(lengthType).value;
+                if (typeL.localeCompare("string:Percentuale") == 0) {
+                    $scope.rate = typeL;
+                    $scope.phrases = null;
+                    $scope.lengthValue = document.getElementById(rateValue).value;
+                } else {
+                    $scope.rate = null;
+                    $scope.phrases = typeL;
+                    $scope.lengthValue = document.getElementById(phrasesValue).value;
+                    if ($scope.lengthValue == "") {
+                        $scope.lengthValue = "0";
+                    }
+                }
+                document.getElementById("submit_" + lengthType).disabled = !($scope.lengthValue > 0 && $scope.lengthValue % 1 == 0);
+
+            };
+
+        });
+
+    </script>
+</head>
+<body ng-app="summarizerApp" ng-controller="controllerSummarizer">
+
+<div class="modal fade" id="summaryDoc" role="dialog">
+    <div class="modal-dialog">
+        <!-- Modal content-->
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Riassunto doc: {{nameSumm}}</h4>
+            </div>
+            <div class="modal-body">
+                <p align="right">
+                    <button type="button" class="btn btn-default btn-md" data-toggle="modal"
+                            data-target="#settingsSummary"><span class="glyphicon glyphicon-cog"></span>
+                    </button>
+                </p>
+                <label><b>Token riassunto</b></label> (campo opzionale)<br>
+                <p><input type="text" placeholder="Token" name="querySummary" class="form-control" id="querySummary">
+                </p>
+                <div class="row">
+                    <div class="col-sm-6">
+                        <label><b>Lunghezza riassunto</b></label><br>
+                        <select class="form-control" name="lengthTypeD" id="lengthTypeD" ng-model="typeD"
+                                ng-options="typeD for typeD in typeLength"
+                                ng-change="valuedInputSummary('lengthTypeD', 'rateValueD', 'phrasesValueD')">
+                        </select>
+                    </div>
+                    <div class="col-sm-6" ng-show="rate">
+                        <label><b>Imposta Percentuale</b> : {{lengthValue}}</label><br>
+                        <p><input type="range" name="rateValueD" id="rateValueD" min="0" max="100" step="1"
+                                  ng-model="rateValueD"
+                                  ng-change="valuedInputSummary('lengthTypeD', 'rateValueD', 'phrasesValueD')"></p>
+                    </div>
+                    <div class="col-sm-6" ng-show="phrases">
+                        <label><b>Numero Frasi</b></label><br>
+                        <p><input type="number" class="form-control" name="phrasesValueD" id="phrasesValueD"
+                                  min="1" ng-model="phrasesValueD"
+                                  ng-change="valuedInputSummary('lengthTypeD', 'rateValueD', 'phrasesValueD')"></p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="submit_lengthTypeD" class="btn btn-success"
+                        ng-click="summaryDocument()" data-dismiss="modal" disabled>Riassumi
+                </button>
+                <button type="button" class="btn btn-danger" data-dismiss="modal">Annulla</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="settingsSummary" role="dialog">
+    <div class="modal-dialog">
+        <!-- Modal content-->
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">Impostazioni Riassunto</h4>
+            </div>
+            <div class="modal-body">
+                <div class='alert alert-warning alert-dismissible'>
+                    <a href='#' class='close' data-dismiss='alert' aria-label='close'>&times;</a>
+                    <strong>Attenzione!</strong> Modificando i valori non viene garantito un riassunto significativo.
+                </div>
+                <label><b>Soglia di ridondanza </b></label> (Default : 0,95)<br>
+                <p><input type="number" placeholder="Redundancy thresold" class="form-control"
+                          name="redundancy_thresold"
+                          id="redundancy_thresold" value="0.95" min="0" max="1">
+                </p>
+                <label><b>Soglia tdidf </b></label> (Default : 0,2)<br>
+                <p><input type="number" placeholder="Redundancy thresold" class="form-control" name="tdidf_threshold"
+                          id="tdidf_threshold" value="0.2" min="0" max="1">
+                </p>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="submit_summary" class="btn btn-success"
+                        ng-click="setParamSummary()" data-dismiss="modal">Imposta
+                </button>
+                <button type="button" class="btn btn-danger" data-dismiss="modal">Annulla</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<label><b>Titolo Documento</b></label><br>
+<p><input type="text" placeholder="Token" name="titleDoc" class="form-control" id="titleDoc">
+</p>
+<label><b>Testo Doc</b></label><br>
+<p><textarea name="textDoc" id="textDoc" cols="100" rows="15"></textarea>
+</p>
+<button type="button" class="btn btn-success" data-toggle="modal"
+        ng-click="nameSummary()" data-target="#summaryDoc">Riassumi
+</button>
+
+<div ng-show="summaryD">
+
+
+    <label><b>Riassunto</b></label><br>
+    <p><textarea name="summaryText" id="summaryText" cols="100" rows="20"></textarea>
+    </p>
+</div>
+
+
+</body>
+</html>
