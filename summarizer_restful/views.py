@@ -7,7 +7,7 @@ from django.http import JsonResponse
 
 import summarizer
 
-s = summarizer.Summarizer(model_path="model_it.bin")
+s = summarizer.Summarizer(model_path="model.bin")
 
 class Summary(generics.GenericAPIView, mixins.CreateModelMixin):
     def post(self, request):
